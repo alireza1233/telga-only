@@ -78,16 +78,19 @@ jobs:
           $gradleHome = "$env:USERPROFILE\.gradle"
           if (Test-Path $gradleHome) {
             robocopy $gradleHome "$target\.gradle" /E /COPY:DAT /R:5 /W:5 /NFL /NDL
+            if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
           }
 
           $pubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
           if (Test-Path $pubCache) {
             robocopy $pubCache "$target\pub-cache" /E /COPY:DAT /R:5 /W:5 /NFL /NDL
+            if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
           }
 
           $sdkPath = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { "$env:LOCALAPPDATA\Android\Sdk" }
           if (Test-Path $sdkPath) {
             robocopy $sdkPath "$target\Sdk" /E /COPY:DAT /R:5 /W:5 /NFL /NDL
+            if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
           }
 
       - name: Install 7-Zip
