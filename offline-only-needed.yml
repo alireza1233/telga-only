@@ -1,0 +1,159 @@
+name: 🔄 Incremental Offline Bundle (Only Changed Parts)
+
+on: workflow_dispatch
+
+jobs:
+  build-and-package-changes:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout telga-only project
+        uses: actions/checkout@v4
+        with:
+          repository: alireza1233/telga-only
+          path: telga-only
+
+      - name: Setup Flutter stable 3.24.3
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.3'
+          channel: 'stable'
+          cache: true
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          java-package: jdk
+
+      - name: Setup custom Android SDK (into ./Sdk)
+        shell: pwsh
+        run: |
+          $sdkRoot = "${{ github.workspace }}\Sdk"
+          New-Item -ItemType Directory -Force -Path $sdkRoot | Out-Null
+          $env:ANDROID_HOME = $sdkRoot
+          $env:ANDROID_SDK_ROOT = $sdkRoot
+          echo "ANDROID_HOME=$sdkRoot" >> $env:GITHUB_ENV
+
+          # download and extract command line tools
+          $toolsUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
+          $zipFile = "$env:TEMP\cmdline-tools.zip"
+          Invoke-WebRequest -Uri $toolsUrl -OutFile $zipFile
+          $extractPath = "$env:TEMP\cmdline-extract"
+          Expand-Archive -Path $zipFile -DestinationPath $extractPath -Force
+          $sdkManagerSource = Get-ChildItem -Path $extractPath -Recurse -Filter "sdkmanager.bat" | Select-Object -First 1
+          $latestDir = "$sdkRoot\cmdline-tools\latest"
+          New-Item -ItemType Directory -Force -Path $latestDir | Out-Null
+          Copy-Item -Path "$($sdkManagerSource.Directory.Parent.FullName)\*" -Destination $latestDir -Recurse -Force
+          Remove-Item $zipFile, $extractPath -Recurse -Force
+
+          # accept licenses
+          $sdkmanager = "$latestDir\bin\sdkmanager.bat"
+          for ($i=0; $i -lt 10; $i++) { echo y | & $sdkmanager --licenses 2>&1 > $null }
+
+          # install minimal required platforms & build-tools (adjust as needed)
+          & $sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "build-tools;33.0.0"
+
+      - name: Build telga-only project to populate caches
+        shell: pwsh
+        run: |
+          cd telga-only
+          flutter pub get
+          flutter build apk --debug
+          flutter build apk --release
+          flutter build windows --debug
+          flutter build windows --release
+          cd android
+          .\gradlew assembleDebug --no-daemon
+          .\gradlew assembleRelease --no-daemon
+          cd ../..
+
+      - name: Collect changed folders (gradle cache, pub-cache, Android SDK)
+        shell: pwsh
+        run: |
+          $target = "offline-changes"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+
+          # Gradle user home (caches and wrapper distributions)
+          $gradleHome = "$env:USERPROFILE\.gradle"
+          if (Test-Path $gradleHome) {
+            Copy-Item -Path $gradleHome -Destination "$target\.gradle" -Recurse -Force
+          }
+
+          # Pub cache
+          $pubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
+          if (Test-Path $pubCache) {
+            Copy-Item -Path $pubCache -Destination "$target\pub-cache" -Recurse -Force
+          }
+
+          # Android SDK (our custom Sdk folder)
+          $sdkPath = "${{ github.workspace }}\Sdk"
+          if (Test-Path $sdkPath) {
+            Copy-Item -Path $sdkPath -Destination "$target\Sdk" -Recurse -Force
+          }
+
+          # Optional: also copy local.properties or any other small config?
+          # Not needed.
+
+          Write-Host "Collected folders into $target"
+
+      - name: Install 7-Zip
+        shell: pwsh
+        run: |
+          choco install 7zip -y --no-progress
+          $env:PATH = "C:\Program Files\7-Zip;$env:PATH"
+
+      - name: Create 7z archive of collected changes
+        shell: pwsh
+        run: |
+          & "C:\Program Files\7-Zip\7z.exe" a -t7z -mx=9 -md=64m -mmt=on "offline-changes.7z" ".\offline-changes\" -bsp1 -bse1
+          Write-Host "Size: $([math]::Round((Get-Item 'offline-changes.7z').Length / 1GB, 2)) GB"
+
+      - name: Split archive into parts (1.8GB each)
+        shell: bash
+        run: |
+          split -b 1800M -a 2 -d --verbose offline-changes.7z "offline-changes.7z.part"
+          ls -lh offline-changes.7z.part*
+
+      - name: Create GitHub Release
+        id: create_release
+        run: |
+          $tag = "incremental-changes-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+          echo "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+          gh release create $tag --title "Incremental Changes (Gradle cache, Pub cache, Android SDK)" --notes "Only the parts that change after building. Download all .part files, combine, and extract." --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+
+      - name: Upload split parts to Release
+        run: |
+          Get-ChildItem -Filter "offline-changes.7z.part*" | ForEach-Object {
+            gh release upload $env:RELEASE_TAG "$($_.FullName)" --clobber --repo "${{ github.repository }}"
+            Write-Host "Uploaded $($_.Name) ($([math]::Round($_.Length/1MB,2)) MB)"
+          }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+
+      - name: Upload combine script
+        run: |
+          $scriptContent = @"
+          @echo off
+          echo Combining split parts into one 7z archive...
+          copy /b offline-changes.7z.part* offline-changes-combined.7z
+          echo.
+          echo Extracting combined archive with 7-Zip (if installed)...
+          7z x offline-changes-combined.7z -y
+          echo.
+          echo Done! Now you have .gradle, pub-cache, and Sdk folders.
+          echo To use: set ANDROID_HOME=...\Sdk, set GRADLE_USER_HOME=...\.gradle, set PUB_CACHE=...\pub-cache
+          pause
+          "@
+          $scriptContent | Out-File -FilePath "combine_and_extract.bat" -Encoding ascii
+          gh release upload $env:RELEASE_TAG "combine_and_extract.bat" --clobber --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
