@@ -93,6 +93,9 @@ jobs:
             if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
           }
 
+          # Force exit code 0 because robocopy returns 1 on success
+          exit 0
+
       - name: Install 7-Zip
         shell: pwsh
         run: |
