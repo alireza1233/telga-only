@@ -1,0 +1,69 @@
+name: Download, split into 95MB parts, and push to repo
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_url:
+        description: 'لینک مستقیم فایل بزرگ (مثلاً از Release)'
+        required: true
+      target_folder:
+        description: 'پوشه مقصد در مخزن برای قطعات'
+        required: false
+        default: 'downloads'
+      part_prefix:
+        description: 'پیشوند نام قطعات (بدون پسوند، مثلاً myfile)'
+        required: false
+        default: 'downloaded-part'
+
+jobs:
+  download-split-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download file
+        run: |
+          curl -L -o original_file "${{ github.event.inputs.file_url }}"
+
+      - name: Split into 95MB parts
+        run: |
+          mkdir -p "${{ github.event.inputs.target_folder }}"
+          split -b 95M -d -a 3 original_file "${{ github.event.inputs.target_folder }}/${{ github.event.inputs.part_prefix }}."
+
+      - name: Remove original large file
+        run: rm -f original_file
+
+      - name: Configure git buffer and user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config http.postBuffer 1073741824  # 1GB buffer
+
+      - name: Push parts in batches
+        run: |
+          # لیست مرتب تمام قطعات
+          parts=($(ls "${{ github.event.inputs.target_folder }}/${{ github.event.inputs.part_prefix }}."* | sort))
+          batch_size=10
+          total=${#parts[@]}
+          echo "Total parts: $total"
+
+          for ((i=0; i<total; i+=batch_size)); do
+            end=$((i + batch_size - 1))
+            if [ $end -ge $total ]; then
+              end=$((total - 1))
+            fi
+            # اضافه کردن دسته فعلی
+            for ((j=i; j<=end; j++)); do
+              git add "${parts[j]}"
+            done
+            # کامیت با شماره محدوده قطعات
+            git commit -m "Add parts $i to $end of ${{ github.event.inputs.part_prefix }}" || echo "No changes in this batch"
+            # پوش کردن دسته
+            git push
+            echo "Pushed batch $i to $end"
+          done
