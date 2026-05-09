@@ -15,7 +15,7 @@ jobs:
           repository: alireza1233/telga-only
           path: telga-only
 
-      - name: Setup Flutter 3.41.9 (Dart 3.11+)
+      - name: Setup Flutter 3.41.9
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.9'
@@ -29,31 +29,23 @@ jobs:
           java-version: '17'
           java-package: jdk
 
-      - name: Setup custom Android SDK (into ./Sdk)
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+
+      - name: Enable Windows desktop support for the project
         shell: pwsh
         run: |
-          $sdkRoot = "${{ github.workspace }}\Sdk"
-          New-Item -ItemType Directory -Force -Path $sdkRoot | Out-Null
-          $env:ANDROID_HOME = $sdkRoot
-          $env:ANDROID_SDK_ROOT = $sdkRoot
-          echo "ANDROID_HOME=$sdkRoot" >> $env:GITHUB_ENV
+          cd telga-only
+          flutter config --enable-windows-desktop
+          flutter create --platforms=windows .
+          cd ..
 
-          $toolsUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
-          $zipFile = "$env:TEMP\cmdline-tools.zip"
-          Invoke-WebRequest -Uri $toolsUrl -OutFile $zipFile
-          $extractPath = "$env:TEMP\cmdline-extract"
-          Expand-Archive -Path $zipFile -DestinationPath $extractPath -Force
-          $sdkManagerSource = Get-ChildItem -Path $extractPath -Recurse -Filter "sdkmanager.bat" | Select-Object -First 1
-          $latestDir = "$sdkRoot\cmdline-tools\latest"
-          New-Item -ItemType Directory -Force -Path $latestDir | Out-Null
-          Copy-Item -Path "$($sdkManagerSource.Directory.Parent.FullName)\*" -Destination $latestDir -Recurse -Force
-          Remove-Item $zipFile, $extractPath -Recurse -Force
-
-          $sdkmanager = "$latestDir\bin\sdkmanager.bat"
-          for ($i=0; $i -lt 10; $i++) { echo y | & $sdkmanager --licenses 2>&1 > $null }
-          & $sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-
-      - name: Build telga-only project to populate caches
+      - name: Build project to populate caches
         shell: pwsh
         run: |
           cd telga-only
@@ -80,9 +72,9 @@ jobs:
             Copy-Item -Path $pubCache -Destination "$target\pub-cache" -Recurse -Force
           }
 
-          $sdkPath = "${{ github.workspace }}\Sdk"
+          $sdkPath = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { "$env:LOCALAPPDATA\Android\Sdk" }
           if (Test-Path $sdkPath) {
-            Copy-Item -Path $sdkPath -Destination "$target\Sdk" -Recurse -Force
+            Copy-Item -Path $sdkPath -Destination "$target\Sdk" -Recurse -Force -ErrorAction SilentlyContinue
           }
 
       - name: Install 7-Zip
