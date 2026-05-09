@@ -15,7 +15,7 @@ jobs:
           repository: alireza1233/telga-only
           path: telga-only
 
-      - name: Setup Flutter 3.41.9
+      - name: Setup Flutter 3.41.9 (Dart 3.11+)
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.9'
@@ -37,13 +37,13 @@ jobs:
             platforms;android-34
             build-tools;34.0.0
 
-      - name: Create dummy .env file (missing from repo)
+      - name: Create dummy .env file (required by project)
         shell: pwsh
         run: |
           cd telga-only
           New-Item -Path ".env" -ItemType File -Value "# dummy environment variables" -Force
 
-      - name: Enable Windows desktop support for the project
+      - name: Enable Windows desktop support and create windows folder
         shell: pwsh
         run: |
           cd telga-only
@@ -51,7 +51,7 @@ jobs:
           flutter create --platforms=windows .
           cd ..
 
-      - name: Build project to populate caches
+      - name: Build project (Android & Windows) to populate all caches
         shell: pwsh
         run: |
           cd telga-only
@@ -62,7 +62,14 @@ jobs:
           flutter build windows --release
           cd ..
 
-      - name: Collect changed folders (gradle cache, pub-cache, Android SDK)
+      - name: Stop Gradle daemons to release any file locks
+        shell: pwsh
+        run: |
+          cd telga-only/android
+          .\gradlew --stop
+          cd ../..
+
+      - name: Collect changed folders (.gradle, pub-cache, Android SDK)
         shell: pwsh
         run: |
           $target = "offline-changes"
@@ -70,17 +77,17 @@ jobs:
 
           $gradleHome = "$env:USERPROFILE\.gradle"
           if (Test-Path $gradleHome) {
-            Copy-Item -Path $gradleHome -Destination "$target\.gradle" -Recurse -Force
+            robocopy $gradleHome "$target\.gradle" /E /COPY:DAT /R:5 /W:5 /NFL /NDL
           }
 
           $pubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
           if (Test-Path $pubCache) {
-            Copy-Item -Path $pubCache -Destination "$target\pub-cache" -Recurse -Force
+            robocopy $pubCache "$target\pub-cache" /E /COPY:DAT /R:5 /W:5 /NFL /NDL
           }
 
           $sdkPath = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { "$env:LOCALAPPDATA\Android\Sdk" }
           if (Test-Path $sdkPath) {
-            Copy-Item -Path $sdkPath -Destination "$target\Sdk" -Recurse -Force -ErrorAction SilentlyContinue
+            robocopy $sdkPath "$target\Sdk" /E /COPY:DAT /R:5 /W:5 /NFL /NDL
           }
 
       - name: Install 7-Zip
@@ -89,10 +96,11 @@ jobs:
           choco install 7zip -y --no-progress
           $env:PATH = "C:\Program Files\7-Zip;$env:PATH"
 
-      - name: Create 7z archive
+      - name: Create 7z archive of the collected folders
         shell: pwsh
         run: |
           & "C:\Program Files\7-Zip\7z.exe" a -t7z -mx=9 -md=64m -mmt=on "offline-changes.7z" ".\offline-changes\" -bsp1 -bse1
+          Write-Host "Archive size: $([math]::Round((Get-Item 'offline-changes.7z').Length / 1GB, 2)) GB"
 
       - name: Split archive into 1.8GB parts
         shell: bash
@@ -105,29 +113,33 @@ jobs:
         run: |
           $tag = "incremental-changes-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
           echo "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
-          gh release create $tag --title "Incremental Changes (Gradle cache, Pub cache, Android SDK)" --notes "Download all .part files, then combine and extract." --repo "${{ github.repository }}"
+          gh release create $tag --title "Incremental Offline Bundle (Gradle, Pub, Android SDK)" --notes "Download all .part files, then run combine_and_extract.bat" --repo "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
 
-      - name: Upload split parts
+      - name: Upload split parts to Release
         run: |
           Get-ChildItem -Filter "offline-changes.7z.part*" | ForEach-Object {
             gh release upload $env:RELEASE_TAG "$($_.FullName)" --clobber --repo "${{ github.repository }}"
+            Write-Host "Uploaded $($_.Name) ($([math]::Round($_.Length/1MB,2)) MB)"
           }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
 
-      - name: Upload combine script
+      - name: Upload combine & extract helper script
         run: |
           $scriptContent = @"
           @echo off
-          echo Combining split parts...
+          echo Combining split parts into a single 7z archive...
           copy /b offline-changes.7z.part* offline-changes-combined.7z
-          echo Extracting...
+          echo.
+          echo Extracting with 7-Zip (make sure 7z is in PATH)...
           7z x offline-changes-combined.7z -y
-          echo Done. You now have .gradle, pub-cache, and Sdk folders.
+          echo.
+          echo Done! You now have .gradle, pub-cache, and Sdk folders.
+          echo Set environment variables as needed.
           pause
           "@
           $scriptContent | Out-File -FilePath "combine_and_extract.bat" -Encoding ascii
