@@ -37,6 +37,12 @@ jobs:
             platforms;android-34
             build-tools;34.0.0
 
+      - name: Create dummy .env file (missing from repo)
+        shell: pwsh
+        run: |
+          cd telga-only
+          New-Item -Path ".env" -ItemType File -Value "# dummy environment variables" -Force
+
       - name: Enable Windows desktop support for the project
         shell: pwsh
         run: |
