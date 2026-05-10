@@ -1,0 +1,82 @@
+name: 📊 Code Analysis - Find all Dart/Flutter errors
+
+on:
+  workflow_dispatch:        # اجرای دستی از تب Actions
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main ]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true
+
+      - name: Setup JDK 17 (برای Gradle در آنالیز)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            build/
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run flutter analyze (strict)
+        id: flutter_analyze
+        continue-on-error: true   # اجازه می‌دهیم که بعداً خروجی را ثبت کنیم، ولی در آخر خطا را برگردانیم
+        run: |
+          flutter analyze --fatal-infos --fatal-warnings > flutter_analysis_output.txt 2>&1
+          cat flutter_analysis_output.txt
+
+      - name: (Optional) Install and run dart_code_metrics (DCM)
+        continue-on-error: true
+        run: |
+          dart pub global activate dart_code_metrics
+          export PATH="$PATH":"$HOME/.pub-cache/bin"
+          dcm analyze --fatal-style --fatal-performance --fatal-warnings . > dcm_analysis_output.txt 2>&1 || true
+          cat dcm_analysis_output.txt
+
+      - name: Collect all analysis results
+        run: |
+          echo "=== FLUTTER ANALYZE OUTPUT ===" > analysis_report.txt
+          cat flutter_analysis_output.txt >> analysis_report.txt
+          echo "=== DCM OUTPUT (if any) ===" >> analysis_report.txt
+          cat dcm_analysis_output.txt >> analysis_report.txt 2>/dev/null || echo "DCM not executed" >> analysis_report.txt
+
+      - name: Upload analysis report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-report
+          path: analysis_report.txt
+          retention-days: 7
+
+      - name: Check for critical errors
+        run: |
+          if grep -q "error •" flutter_analysis_output.txt; then
+            echo "❌ Flutter analysis found errors (including possible duplicate '_' problems)."
+            exit 1
+          fi
+          if grep -qi "error" dcm_analysis_output.txt 2>/dev/null; then
+            echo "❌ DCM analysis found errors."
+            exit 1
+          fi
+          echo "✅ No critical errors found."
