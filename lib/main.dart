@@ -32,15 +32,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 
-  // Load environment variables
   await dotenv.load(fileName: ".env");
 
-  // Initialize logging system with minimal TDLib logging
   await LoggingConfig.initialize(
-    tdlibLogLevel: TdLibLogLevel.fatal, // Minimal C++ logging
+    tdlibLogLevel: TdLibLogLevel.fatal,
   );
 
-  // Pre-load SharedPreferences so theme/appearance reads are sync at first frame.
   final prefs = await SharedPreferences.getInstance();
 
   runApp(
@@ -85,7 +82,6 @@ class _AppWrapperState extends ConsumerState<AppWrapper>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Initialize emoji data for custom rendering
     EmojiData().initialize();
   }
 
@@ -98,7 +94,6 @@ class _AppWrapperState extends ConsumerState<AppWrapper>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Force TDLib to reconnect when app resumes
       ref.read(telegramClientProvider).setNetworkType(isOnline: true);
     }
   }
@@ -109,31 +104,26 @@ class _AppWrapperState extends ConsumerState<AppWrapper>
 
     return authAsync.when(
       data: (authState) {
-        // Show appropriate screen based on auth state
         if (authState.isAuthenticated) {
-          // Also wait for chats to be loaded before showing home screen
           final chatAsync = ref.watch(chatProvider);
           return chatAsync.when(
             data: (chatState) {
-              // Only show home screen when chats are initialized
               if (chatState.isInitialized) {
                 return const HomeScreen();
               }
               return _buildLoadingScreen();
             },
             loading: () => _buildLoadingScreen(),
-            error: (_, _) =>
-                const HomeScreen(), // Show home on chat error, let it handle retry
+            error: (_, __) => const HomeScreen(), // اصلاح شده
           );
         } else if (!authState.isInitialized) {
-          // Still determining auth status - show loading
           return _buildLoadingScreen();
         } else {
           return const AuthScreen();
         }
       },
       loading: () => _buildLoadingScreen(),
-      error: (error, stackTrace) {
+      error: (_, __) { // اصلاح شده
         final colorScheme = Theme.of(context).colorScheme;
         return Scaffold(
           body: Center(
@@ -152,7 +142,7 @@ class _AppWrapperState extends ConsumerState<AppWrapper>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  error.toString(),
+                  'Initialization error',
                   style: TextStyle(color: colorScheme.error, fontSize: 14),
                   textAlign: TextAlign.center,
                 ),
@@ -184,7 +174,7 @@ class _AppWrapperState extends ConsumerState<AppWrapper>
               _loadingPhrase,
               style: TextStyle(
                 fontSize: 16,
-                color: colorScheme.onSurface.withValues(alpha: 0.7),
+                color: colorScheme.onSurface.withOpacity(0.7), // اصلاح withValues → withOpacity
               ),
             ),
             const SizedBox(height: 12),
