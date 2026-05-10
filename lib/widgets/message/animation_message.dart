@@ -180,7 +180,7 @@ class _AnimationMessageWidgetState
                   ),
                 ),
               // اصلاح شده
-              if (error != null) error!,
+              if (error != null) error,
               if (!hasAnimation && error == null)
                 Center(
                   child: CircularDownloadProgress(
