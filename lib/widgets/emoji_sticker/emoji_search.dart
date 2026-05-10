@@ -138,7 +138,7 @@ class _EmojiSearchWidgetState extends ConsumerState<EmojiSearchWidget> {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, _) => _buildError(),
+      error: (_, __) => _buildError(),
     );
   }
 
