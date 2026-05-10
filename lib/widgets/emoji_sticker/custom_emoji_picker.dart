@@ -293,7 +293,7 @@ class _CustomEmojiPickerState extends ConsumerState<CustomEmojiPicker>
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, _) => Center(
+      error: (_, __) => Center(   // <-- این خط اصلاح شد (__ به جای _ دوم)
         child: Text(
           'Error loading recent emojis',
           style: TextStyle(color: colorScheme.error),
