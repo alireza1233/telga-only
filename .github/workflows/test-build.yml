@@ -13,10 +13,10 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
 
-      - name: Setup Flutter stable (آخرین نسخه پایدار)
+      - name: Setup Flutter stable
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'   # نسخه واقعی و پایدار
+          flutter-version: '3.27.4'
           channel: 'stable'
           cache: true
 
@@ -36,24 +36,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Clean everything
-        run: |
-          flutter clean
-          cd android
-          chmod +x gradlew
-          ./gradlew clean
-          cd ..
-          rm -rf ~/.pub-cache
-          flutter pub cache repair
+      - name: Clean Flutter build
+        run: flutter clean
 
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Refresh Gradle dependencies (حل مشکل 403)
-        run: |
-          cd android
-          ./gradlew build --refresh-dependencies --no-daemon
-          cd ..
+      - name: Validate Gradle Wrapper
+        run: cd android && chmod +x gradlew && ./gradlew --version && cd ..
 
       - name: Build Android APK (debug)
         run: flutter build apk --debug
