@@ -13,10 +13,10 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
 
-      - name: Setup Flutter stable
+      - name: Setup Flutter stable (آخرین نسخه پایدار)
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.4'
+          flutter-version: '3.31.0'   # با Dart 3.8.0 که نیازهای پکیج رو برآورده می‌کنه
           channel: 'stable'
           cache: true
 
