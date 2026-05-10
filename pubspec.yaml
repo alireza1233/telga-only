@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.6.0 <4.0.0"   # <<< این خط رو عوض کردم
+  sdk: ">=3.6.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -35,7 +35,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ^5.0.0    # <-- از 6 به 5 تغییر کرد
 
 flutter:
   uses-material-design: true
