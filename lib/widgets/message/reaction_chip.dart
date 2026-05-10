@@ -40,7 +40,7 @@ class _ReactionChipState extends State<ReactionChip> {
     final restingFill = isChosen
         ? colorScheme.primaryContainer
         : colorScheme.surfaceContainerHighest;
-    final pressedFill = colorScheme.primary.withValues(alpha: 0.18);
+    final pressedFill = colorScheme.primary.withOpacity(0.18); // اصلاح شده
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -65,7 +65,7 @@ class _ReactionChipState extends State<ReactionChip> {
             border: Border.all(
               color: isChosen
                   ? colorScheme.primary
-                  : colorScheme.outline.withValues(alpha: 0.3),
+                  : colorScheme.outline.withOpacity(0.3), // اصلاح شده
               width: 1,
             ),
           ),
@@ -81,7 +81,7 @@ class _ReactionChipState extends State<ReactionChip> {
                   fontWeight: isChosen ? FontWeight.w600 : FontWeight.w400,
                   color: isChosen
                       ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSurface.withValues(alpha: 0.7),
+                      : colorScheme.onSurface.withOpacity(0.7), // اصلاح شده
                 ),
               ),
             ],
@@ -124,7 +124,7 @@ class ReactionGlyph extends StatelessWidget {
           errorBuilder: (_, _, _) => Icon(
             Icons.emoji_emotions,
             size: 14,
-            color: colorScheme.onSurface.withValues(alpha: 0.6),
+            color: colorScheme.onSurface.withOpacity(0.6), // اصلاح شده
           ),
         ),
       );
@@ -135,14 +135,14 @@ class ReactionGlyph extends StatelessWidget {
         height: 14,
         child: CircularProgressIndicator(
           strokeWidth: 1.5,
-          color: colorScheme.onSurface.withValues(alpha: 0.4),
+          color: colorScheme.onSurface.withOpacity(0.4), // اصلاح شده
         ),
       );
     }
     return Icon(
       Icons.emoji_emotions,
       size: 14,
-      color: colorScheme.onSurface.withValues(alpha: 0.6),
+      color: colorScheme.onSurface.withOpacity(0.6), // اصلاح شده
     );
   }
 }
