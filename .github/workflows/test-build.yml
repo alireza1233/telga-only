@@ -13,13 +13,12 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
 
-      - name: Setup Flutter stable (آخرین نسخه پایدار)
+      - name: Setup Flutter 3.27.4 (پایدار و موجود)
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'          # اکشن خودکار آخرین ورژن پایدار رو میاره
+          flutter-version: '3.27.4'
           channel: 'stable'
           cache: true
-          # flutter-version-file: pubspec.yaml   # (اختیاری) اگر خواستی از نسخه داخل pubspec استفاده کنه
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
