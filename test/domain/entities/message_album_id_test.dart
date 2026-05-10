@@ -2,15 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:telega2/domain/entities/chat.dart';
 
 Map<String, dynamic> _baseMessageJson({Object? mediaAlbumId}) {
-  return {
+  final map = {
     'id': 1,
     'chat_id': 100,
     'sender_id': {'@type': 'messageSenderUser', 'user_id': 200},
     'date': 1719340800,
     'is_outgoing': false,
     'content': {'@type': 'messageText', 'text': {'text': 'hi'}},
-    'media_album_id': ?mediaAlbumId,
   };
+  if (mediaAlbumId != null) {
+    map['media_album_id'] = mediaAlbumId;
+  }
+  return map;
 }
 
 void main() {
