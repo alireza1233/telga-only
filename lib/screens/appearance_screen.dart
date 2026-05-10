@@ -31,7 +31,7 @@ class AppearanceScreen extends ConsumerWidget {
               onTap: () => actions.setBubble(style),
             ),
           const Divider(height: 1),
-          _SectionHeader('Density'),
+                    _SectionHeader('Density'),
           Column(
             children: [
               for (final density in Density.values)
