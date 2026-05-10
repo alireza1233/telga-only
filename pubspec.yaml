@@ -14,14 +14,14 @@ dependencies:
   ffi: ^2.1.0
   path_provider: ^2.1.0
   flutter_riverpod: ^3.0.3
-  mobile_scanner: ^7.0.1
+  mobile_scanner: ^6.0.0        # <-- نسخه 6 سازگار با Dart 3.6
   shared_preferences: ^2.2.0
   path: ^1.8.0
   country_picker: ^2.0.26
   logger: ^2.0.2+1
   intl: ^0.20.2
   flutter_dotenv: ^6.0.0
-  lottie: ^3.2.0                # <-- تغییر از 3.3.2 به 3.2.0
+  lottie: ^3.2.0
   file_picker: ^10.3.10
   image_picker: ^1.1.2
   media_kit: ^1.1.11
@@ -30,12 +30,12 @@ dependencies:
   url_launcher: ^6.2.5
   photo_manager: ^3.5.0
   photo_manager_image_provider: ^2.2.0
-  extended_image: ^9.1.0       # نسخه موجود و سازگار با Dart 3.6
+  extended_image: ^9.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0          # نسخه سازگار با Dart 3.6
+  flutter_lints: ^5.0.0
 
 flutter:
   uses-material-design: true
