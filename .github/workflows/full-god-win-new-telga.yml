@@ -1,16 +1,19 @@
-name: 🔥 OFFLINE BUNDLE for Telga (Android + Windows)
+name: 🔥 ULTIMATE OFFLINE BUNDLE (Android + Windows) - Split for GitHub Releases
 
 on: workflow_dispatch
 
 jobs:
-  build-offline:
+  build-complete-offline:
     runs-on: windows-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout current repo (alireza1233/telga-only)
+      - name: Checkout YOUR messenger app (public repo)
         uses: actions/checkout@v4
+        with:
+          repository: alireza1233/telga-only
+          path: my_app
 
       - name: Setup Flutter stable 3.24.3
         uses: subosito/flutter-action@v2
@@ -51,7 +54,7 @@ jobs:
 
             $sdkmanagerFile = Get-ChildItem -Path $tempExtract -Recurse -Filter "sdkmanager.bat" | Select-Object -First 1
             if (-not $sdkmanagerFile) {
-              Write-Error "sdkmanager.bat not found"
+              Write-Error "sdkmanager.bat not found in extracted files!"
               exit 1
             }
 
@@ -63,29 +66,77 @@ jobs:
             Remove-Item $tempExtract -Recurse -Force
           }
 
-          $sdkmanager = "$latestDir\bin\sdkmanager.bat"
+          if (Test-Path "$latestDir\bin\sdkmanager.bat") {
+            $sdkmanager = "$latestDir\bin\sdkmanager.bat"
+          } else {
+            Write-Error "sdkmanager.bat not found after extraction!"
+            exit 1
+          }
+          Write-Host "Using sdkmanager: $sdkmanager"
+
           for ($i=0; $i -lt 10; $i++) { echo y | & $sdkmanager --licenses 2>&1 > $null }
 
           $platforms = 21..35 | ForEach-Object { "platforms;android-$_" }
-          $buildTools = @("35.0.0","34.0.0","33.0.2","33.0.1","33.0.0","32.0.0","31.0.0","30.0.3","29.0.3","28.0.3","27.0.3","26.0.3","25.0.3","24.0.3","23.0.3") | ForEach-Object { "build-tools;$_" }
-          $ndks = @("26.3.11579264","27.0.12077973","25.2.9519653","23.2.8568313","21.4.7075529") | ForEach-Object { "ndk;$_" }
-          $other = @("cmake;3.22.1","emulator","extras;google;m2repository","extras;android;m2repository","platform-tools")
+          $buildTools = @(
+            "35.0.0","34.0.0","33.0.2","33.0.1","33.0.0","32.0.0","31.0.0","30.0.3",
+            "29.0.3","28.0.3","27.0.3","26.0.3","25.0.3","24.0.3","23.0.3"
+          ) | ForEach-Object { "build-tools;$_" }
+          $ndks = @(
+            "26.3.11579264","27.0.12077973","25.2.9519653","23.2.8568313","21.4.7075529"
+          ) | ForEach-Object { "ndk;$_" }
+          $other = @(
+            "cmake;3.22.1",
+            "emulator",
+            "extras;google;m2repository",
+            "extras;android;m2repository",
+            "platform-tools",
+            "system-images;android-34;google_apis;x86_64",
+            "system-images;android-33;google_apis;x86_64",
+            "system-images;android-30;google_apis;x86_64",
+            "system-images;android-29;google_apis;x86_64",
+            "system-images;android-34;google_apis_playstore;x86_64",
+            "extras;intel;Hardware_Accelerated_Execution_Manager"
+          )
           $allPackages = $platforms + $buildTools + $ndks + $other
           $batchSize = 20
           for ($i=0; $i -lt $allPackages.Count; $i += $batchSize) {
             $batch = $allPackages[$i..($i+$batchSize-1)] -join " "
-            Write-Host "Installing $batch"
+            Write-Host "Installing batch $i : $batch"
             & $sdkmanager $batch --verbose
           }
           & $sdkmanager --list
 
-      - name: Install Visual Studio Build Tools + Windows SDK
+      - name: Install Visual Studio Build Tools 2022 + Windows SDK
         shell: pwsh
         run: |
           choco install visualstudio2022buildtools -y --no-progress
           choco install visualstudio2022-workload-vctools -y --no-progress
 
-      - name: Pre-cache Gradle distributions and common plugins
+          $vsPaths = @(
+            "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools",
+            "C:\Program Files\Microsoft Visual Studio\2022\BuildTools"
+          )
+          $msvcLatest = $null
+          foreach ($vsPath in $vsPaths) {
+            $msvcPath = Join-Path $vsPath "VC\Tools\MSVC"
+            if (Test-Path $msvcPath) {
+              $msvcLatest = Get-ChildItem $msvcPath -Directory | Sort-Object Name -Descending | Select-Object -First 1
+              if ($msvcLatest) { break }
+            }
+          }
+
+          $sdkBinPath = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $sdkLatest = Get-ChildItem "$sdkBinPath\10.0.*" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
+
+          if ($msvcLatest -and $sdkLatest) {
+            $env:PATH = "$($msvcLatest.FullName)\bin\Hostx64\x64;$($sdkLatest.FullName)\x64;$env:PATH"
+            Write-Host "MSVC found at: $($msvcLatest.FullName)"
+            Write-Host "Windows SDK found at: $($sdkLatest.FullName)"
+          } else {
+            Write-Warning "MSVC or Windows SDK not found, but continuing"
+          }
+
+      - name: Pre-cache ALL Gradle distributions and common plugins
         shell: pwsh
         run: |
           $gradleUserHome = "$env:USERPROFILE\.gradle"
@@ -101,12 +152,18 @@ jobs:
               Expand-Archive -Path $zipFile -DestinationPath $dest -Force
             }
           }
-
           New-Item -ItemType Directory -Path "gradle-cache-builder" -Force | Out-Null
           Set-Location "gradle-cache-builder"
-          Copy-Item -Path "../gradlew" -Destination "." -Force -ErrorAction SilentlyContinue
-          Copy-Item -Path "../gradlew.bat" -Destination "." -Force -ErrorAction SilentlyContinue
-          Copy-Item -Path "../gradle" -Destination "." -Recurse -Force -ErrorAction SilentlyContinue
+
+          if (Test-Path "../my_app/gradlew.bat") {
+            Copy-Item -Path "../my_app/gradlew" -Destination "." -Force
+            Copy-Item -Path "../my_app/gradlew.bat" -Destination "." -Force
+            Copy-Item -Path "../my_app/gradle" -Destination "." -Recurse -Force
+          } else {
+            Write-Warning "my_app gradlew not found, creating dummy"
+            '@echo off' | Out-File -FilePath "gradlew.bat" -Encoding ascii
+            'echo dummy' | Out-File -FilePath "gradlew.bat" -Encoding ascii -Append
+          }
 
           $gradleBuildScript = @"
           buildscript {
@@ -116,6 +173,7 @@ jobs:
                   classpath 'com.google.gms:google-services:4.4.0'
                   classpath 'com.google.firebase:firebase-crashlytics-gradle:2.9.9'
                   classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22'
+                  classpath 'com.google.dagger:hilt-android-gradle-plugin:2.48'
               }
           }
           allprojects { repositories { mavenCentral() google() } }
@@ -123,25 +181,41 @@ jobs:
           $gradleBuildScript | Out-File -FilePath "build.gradle" -Encoding ascii
           New-Item -ItemType Directory -Path "app" -Force | Out-Null
 
-          if (Test-Path ".\gradlew.bat") { .\gradlew --no-daemon dependencies > $null 2>&1 }
+          if (Test-Path ".\gradlew.bat") {
+            .\gradlew --no-daemon dependencies > $null 2>&1
+          }
           Set-Location ..
 
+      # ======================== ۶- کش پکیج‌های پاب (غیرفعال شده به دلیل سنگینی) ========================
+      # - name: Build extra Pub Cache (many packages)
+      #   shell: pwsh
+      #   run: |
+      #     ...
+
       - name: Generate code with build_runner (Riverpod & Hive)
+        shell: pwsh
         run: |
+          cd my_app
           flutter pub get
           flutter pub run build_runner build --delete-conflicting-outputs
 
-      - name: Build Android and Windows (debug & release)
+      - name: Build YOUR messenger app to cache all project-specific dependencies
+        shell: pwsh
         run: |
+          cd my_app
           flutter build apk --debug
           flutter build apk --release
           flutter build windows --debug
           flutter build windows --release
+          cd android
+          .\gradlew dependencies --no-daemon
+          .\gradlew assembleRelease --no-daemon
+          cd ../..
 
       - name: Assemble ultimate offline folder
         shell: pwsh
         run: |
-          $target = "telga-offline-full"
+          $target = "flutter-offline-full"
           New-Item -ItemType Directory -Force -Path $target | Out-Null
 
           Copy-Item -Path "$env:FLUTTER_ROOT" -Destination "$target\flutter" -Recurse -Force
@@ -159,14 +233,15 @@ jobs:
           $pubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
           Copy-Item -Path $pubCache -Destination "$target\pub-cache" -Recurse -Force
 
-          Copy-Item -Path "$env:USERPROFILE\.android" -Destination "$target\.android" -Recurse -Force -ErrorAction SilentlyContinue
+          $androidConfig = "$env:USERPROFILE\.android"
+          Copy-Item -Path $androidConfig -Destination "$target\.android" -Recurse -Force -ErrorAction SilentlyContinue
 
           $msvcFolder = "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC"
           $winKits = "C:\Program Files (x86)\Windows Kits\10"
           if (Test-Path $msvcFolder) { Copy-Item -Path $msvcFolder -Destination "$target\MSVC" -Recurse -Force -ErrorAction SilentlyContinue }
           if (Test-Path $winKits) { Copy-Item -Path $winKits -Destination "$target\WindowsKits" -Recurse -Force -ErrorAction SilentlyContinue }
 
-          Copy-Item -Path "." -Destination "$target\source_code" -Recurse -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path "my_app" -Destination "$target\my_app_source" -Recurse -Force -ErrorAction SilentlyContinue
 
           $setupBat = @"
           @echo off
@@ -177,26 +252,86 @@ jobs:
           set FLUTTER_ROOT=%~dp0flutter
           for /d %%i in ("%~dp0jdks\17*") do set JAVA_HOME=%%i
           set PATH=%FLUTTER_ROOT%\bin;%JAVA_HOME%\bin;%ANDROID_HOME%\platform-tools;%ANDROID_HOME%\cmdline-tools\latest\bin;%PATH%
-          echo Telga offline environment ready.
+          echo Ultimate offline environment ready.
           "@
           $setupBat | Out-File -FilePath "$target\setup.bat" -Encoding ascii
 
-          Write-Host "Collected in $target"
+          $setupPs1 = @"
+          `$env:ANDROID_HOME = "`$PSScriptRoot\android-sdk"
+          `$env:ANDROID_SDK_ROOT = `$env:ANDROID_HOME
+          `$env:GRADLE_USER_HOME = "`$PSScriptRoot\.gradle"
+          `$env:PUB_CACHE = "`$PSScriptRoot\pub-cache"
+          `$env:FLUTTER_ROOT = "`$PSScriptRoot\flutter"
+          `$jdkPath = Get-ChildItem "`$PSScriptRoot\jdks\17*" -Directory | Select-Object -First 1
+          `$env:JAVA_HOME = `$jdkPath.FullName
+          `$env:PATH = "`$env:FLUTTER_ROOT\bin;`$env:JAVA_HOME\bin;`$env:ANDROID_HOME\platform-tools;`$env:ANDROID_HOME\cmdline-tools\latest\bin;`$env:PATH"
+          Write-Host "Ready."
+          "@
+          $setupPs1 | Out-File -FilePath "$target\setup.ps1" -Encoding ascii
 
-      - name: Create 7z archive
+          Write-Host "All files collected in $target"
+
+      - name: Install 7-Zip
         shell: pwsh
         run: |
           choco install 7zip -y --no-progress
-          & "C:\Program Files\7-Zip\7z.exe" a -t7z -mx=9 -md=64m -mmt=on "telga-offline.7z" ".\telga-offline-full\"
+          $env:PATH = "C:\Program Files\7-Zip;$env:PATH"
 
-      - name: Split & upload to release
+      - name: Create single 7z archive (max compression, no split)
+        shell: pwsh
+        run: |
+          & "C:\Program Files\7-Zip\7z.exe" a -t7z -mx=9 -md=64m -mmt=on "flutter-offline-full.7z" ".\flutter-offline-full\" -bsp1 -bse1
+          Write-Host "Size: $([math]::Round((Get-Item 'flutter-offline-full.7z').Length / 1GB, 2)) GB"
+
+      - name: Test archive integrity
+        shell: pwsh
+        run: |
+          & "C:\Program Files\7-Zip\7z.exe" t "flutter-offline-full.7z"
+          if ($LASTEXITCODE -ne 0) { throw "Archive is corrupted!" }
+
+      - name: Split archive with split command (Git Bash)
         shell: bash
         run: |
-          split -b 1800M -a 2 -d --verbose telga-offline.7z "telga-offline.7z.part"
-          echo "RELEASE_TAG=offline-telga-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV
-          gh release create ${{ env.RELEASE_TAG }} --title "Telga Offline Bundle" --notes "Split parts, combine with 7z"
-          for f in telga-offline.7z.part*; do
-            gh release upload ${{ env.RELEASE_TAG }} "$f" --clobber
-          done
+          echo "Splitting into 1.8GB chunks..."
+          split -b 1800M -a 2 -d --verbose flutter-offline-full.7z "flutter-offline.7z.part"
+          echo "Completed. Parts:"
+          ls -lh flutter-offline.7z.part*
+
+      - name: Create GitHub Release
+        id: create_release
+        run: |
+          $tag = "offline-bundle-v$((Get-Date -Format 'yyyyMMdd-HHmmss'))"
+          echo "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+          gh release create $tag --title "Complete Flutter Offline Bundle (Split Parts)" --notes "Download all .part files, then combine and extract." --repo "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+
+      - name: Upload split parts to Release
+        run: |
+          Get-ChildItem -Filter "flutter-offline.7z.part*" | ForEach-Object {
+            gh release upload $env:RELEASE_TAG "$($_.FullName)" --clobber --repo "${{ github.repository }}"
+            Write-Host "Uploaded $($_.Name) ($([math]::Round($_.Length/1MB,2)) MB)"
+          }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+
+      - name: Upload combine+extract helper script
+        run: |
+          $scriptContent = @"
+          @echo off
+          echo Combining split parts into one 7z archive...
+          copy /b flutter-offline.7z.part* flutter-offline-combined.7z
+          echo.
+          echo Extracting combined archive with 7-Zip...
+          7z x flutter-offline-combined.7z -y
+          echo.
+          echo Done! Run setup.bat to configure environment.
+          pause
+          "@
+          $scriptContent | Out-File -FilePath "combine_and_extract.bat" -Encoding ascii
+          gh release upload $env:RELEASE_TAG "combine_and_extract.bat" --clobber --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
