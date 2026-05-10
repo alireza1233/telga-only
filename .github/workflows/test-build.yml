@@ -7,16 +7,16 @@ jobs:
   test-build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # برای commit کردن APK به مخزن
+      contents: write
 
     steps:
       - name: Checkout the repository (telga-only)
         uses: actions/checkout@v4
 
-      - name: Setup Flutter stable
+      - name: Setup Flutter stable (with Dart 3.7+)
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3'
+          flutter-version: '3.29.0'   # ✅ ارتقا به نسخه‌ای که Dart >=3.11 دارد
           channel: 'stable'
           cache: true
 
@@ -26,24 +26,21 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Enable Flutter desktop (for Windows) - optional, just Android is enough
-        run: |
-          flutter config --enable-android
-          flutter pub get
+      - name: Get dependencies
+        run: flutter pub get
 
       - name: Build Android APK (debug)
-        run: |
-          flutter build apk --debug
+        run: flutter build apk --debug
 
-      - name: Create my-build directory in root
+      - name: Create my-build directory
         run: |
           mkdir -p my-build
           cp build/app/outputs/flutter-apk/app-debug.apk my-build/app-debug.apk
 
-      - name: Commit and push the APK to the main branch
+      - name: Commit and push the APK
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add my-build/app-debug.apk -f
-          git commit -m "Add test APK from workflow [skip ci]" || echo "No changes to commit"
+          git commit -m "Add test APK from workflow [skip ci]" || echo "No changes"
           git push
