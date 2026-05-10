@@ -7,8 +7,8 @@ plugins {
 
 android {
     namespace = "com.example.telega2"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 36  // جایگزین flutter.compileSdkVersion
+    ndkVersion = "27.0.12077973"  // جایگزین flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -24,8 +24,8 @@ android {
         applicationId = "com.example.telega2"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        minSdk = 23  // جایگزین flutter.minSdkVersion
+        targetSdk = 36  // جایگزین flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         ndk {
