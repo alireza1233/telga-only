@@ -1,148 +1,45 @@
-import 'dart:io';
-import 'package:flutter/material.dart';
-import '../../core/theme/motion.dart';
-import '../../domain/entities/chat.dart';
-import '../emoji_sticker/telegram_emoji_widget.dart';
+name: telega2
+description: "A Telegram client built with Flutter and TDLib using Gateway API authentication"
+publish_to: 'none'
 
-/// A single reaction pill with press feedback. The pill scales up slightly and
-/// flashes a primary tint while the user holds it down — short, bounded by
-/// [kAppearanceTransitionDuration], skipped under reduced-motion.
-class ReactionChip extends StatefulWidget {
-  const ReactionChip({
-    super.key,
-    required this.reaction,
-    required this.onTap,
-  });
+version: 1.0.0+1
 
-  final MessageReaction reaction;
-  final VoidCallback? onTap;
+environment:
+  sdk: ">=3.6.0 <4.0.0"
 
-  @override
-  State<ReactionChip> createState() => _ReactionChipState();
-}
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  ffi: ^2.1.0
+  path_provider: ^2.1.0
+  flutter_riverpod: ^2.6.1
+  mobile_scanner: ^6.0.0
+  shared_preferences: ^2.2.0
+  path: ^1.8.0
+  country_picker: ^2.0.26
+  logger: ^2.0.2+1
+  intl: ^0.20.2
+  flutter_dotenv: ^6.0.0
+  lottie: ^3.2.0
+  file_picker: ^10.3.10
+  image_picker: ^1.1.2
+  media_kit: ^1.1.11
+  media_kit_video: ^1.2.5
+  media_kit_libs_video: ^1.0.5
+  url_launcher: ^6.2.5
+  photo_manager: ^3.5.0
+  photo_manager_image_provider: ^2.2.0
+  extended_image: ^9.1.0
 
-class _ReactionChipState extends State<ReactionChip> {
-  bool _pressed = false;
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
 
-  void _setPressed(bool v) {
-    if (_pressed == v) return;
-    setState(() => _pressed = v);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final reaction = widget.reaction;
-    final isChosen = reaction.isChosen;
-    final disabled = widget.onTap == null;
-    final duration = motionDurationFor(context, kAppearanceTransitionDuration);
-
-    final restingFill = isChosen
-        ? colorScheme.primaryContainer
-        : colorScheme.surfaceContainerHighest;
-    final pressedFill = colorScheme.primary.withOpacity(0.18); // اصلاح شده
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: disabled ? null : (_) => _setPressed(true),
-      onTapUp: disabled
-          ? null
-          : (_) {
-              _setPressed(false);
-              widget.onTap!();
-            },
-      onTapCancel: () => _setPressed(false),
-      child: AnimatedScale(
-        scale: _pressed ? 1.08 : 1.0,
-        duration: duration,
-        curve: Curves.easeOutBack,
-        child: AnimatedContainer(
-          duration: duration,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: _pressed ? pressedFill : restingFill,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isChosen
-                  ? colorScheme.primary
-                  : colorScheme.outline.withOpacity(0.3), // اصلاح شده
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ReactionGlyph(reaction: reaction),
-              const SizedBox(width: 4),
-              Text(
-                '${reaction.count}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isChosen ? FontWeight.w600 : FontWeight.w400,
-                  color: isChosen
-                      ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSurface.withOpacity(0.7), // اصلاح شده
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Renders the icon/emoji portion of a reaction chip — emoji widget,
-/// downloaded custom emoji image, loading spinner, or fallback icon.
-class ReactionGlyph extends StatelessWidget {
-  const ReactionGlyph({super.key, required this.reaction});
-
-  final MessageReaction reaction;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    if ((reaction.type == ReactionType.emoji ||
-            reaction.type == ReactionType.paid) &&
-        reaction.emoji != null) {
-      return TelegramEmojiWidget(
-        emoji: reaction.emoji!,
-        size: 16,
-        animated: false,
-      );
-    }
-    if (reaction.type == ReactionType.customEmoji &&
-        reaction.customEmojiPath != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(2),
-        child: Image.file(
-          File(reaction.customEmojiPath!),
-          width: 16,
-          height: 16,
-          fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => Icon(
-            Icons.emoji_emotions,
-            size: 14,
-            color: colorScheme.onSurface.withOpacity(0.6), // اصلاح شده
-          ),
-        ),
-      );
-    }
-    if (reaction.type == ReactionType.customEmoji) {
-      return SizedBox(
-        width: 14,
-        height: 14,
-        child: CircularProgressIndicator(
-          strokeWidth: 1.5,
-          color: colorScheme.onSurface.withOpacity(0.4), // اصلاح شده
-        ),
-      );
-    }
-    return Icon(
-      Icons.emoji_emotions,
-      size: 14,
-      color: colorScheme.onSurface.withOpacity(0.6), // اصلاح شده
-    );
-  }
-}
+flutter:
+  uses-material-design: true
+  assets:
+    # - .env   <-- حذف شد (فایل وجود نداشت و باعث warning می‌شد)
+    - assets/icon.png
+    - assets/emoji/
