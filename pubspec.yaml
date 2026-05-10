@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.7.0 <4.0.0"   # ارتقا برای سازگاری با media_kit_video 2.x
+  sdk: ">=3.7.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -14,7 +14,7 @@ dependencies:
   ffi: ^2.1.0
   path_provider: ^2.1.0
   flutter_riverpod: ^2.6.1
-  mobile_scanner: ^7.0.0          # ارتقا به نسخه 7
+  mobile_scanner: ^7.0.0
   shared_preferences: ^2.2.0
   path: ^1.8.0
   country_picker: ^2.0.26
@@ -24,22 +24,21 @@ dependencies:
   lottie: ^3.2.0
   file_picker: ^10.3.10
   image_picker: ^1.1.2
-  media_kit: ^2.0.0               # ارتقا به 2.x
-  media_kit_video: ^2.0.1         # نسخه پایدار 2.x
-  media_kit_libs_video: ^2.0.0    # ارتقا به 2.x
+  media_kit: ^2.0.0
+  media_kit_video: ^2.0.1
+  media_kit_libs_video: ^2.0.0
   url_launcher: ^6.2.5
   photo_manager: ^3.5.0
   photo_manager_image_provider: ^2.2.0
-  extended_image: ^10.0.0         # ارتقا برای Dart 3.7
+  extended_image: ^10.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0           # ارتقا
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
   assets:
-    # - .env
     - assets/icon.png
     - assets/emoji/
