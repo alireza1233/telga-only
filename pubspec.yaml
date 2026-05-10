@@ -13,7 +13,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   ffi: ^2.1.0
   path_provider: ^2.1.0
-  flutter_riverpod: ^2.6.1          # <-- تغییر از 3 به 2.6.1
+  flutter_riverpod: ^2.6.1
   mobile_scanner: ^6.0.0
   shared_preferences: ^2.2.0
   path: ^1.8.0
@@ -40,6 +40,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - .env
+    # - .env   <-- حذف شد (فایل وجود نداشت و باعث warning می‌شد)
     - assets/icon.png
     - assets/emoji/
