@@ -1,4 +1,4 @@
-name: 📊 Code Analysis - Find all Dart/Flutter errors
+name: 📊 Full Code Analysis (collect all errors)
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ jobs:
       - name: Setup Flutter 3.27.4
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.4'     # نسخه مشخص و پایدار
+          flutter-version: '3.27.4'
           channel: 'stable'
           cache: true
 
@@ -27,37 +27,53 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Cache Flutter dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-            build/
-          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
-
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Run flutter analyze (strict)
-        id: flutter_analyze
-        continue-on-error: true
+      - name: Run flutter analyze (collect all errors, do not fail)
+        id: analyze
+        continue-on-error: true   # اجرا ادامه پیدا می‌کند حتی اگر خطا پیدا شود
         run: |
-          flutter analyze --fatal-infos --fatal-warnings > flutter_analysis_output.txt 2>&1
-          cat flutter_analysis_output.txt
+          flutter analyze --fatal-infos --fatal-warnings > analysis_output.txt 2>&1
+          # همچنین خطاهای استاندارد را هم بگیریم
+          echo "EXIT_CODE=$?" >> $GITHUB_OUTPUT
 
-      - name: Upload analysis report
+      - name: Show output for debugging
+        run: cat analysis_output.txt || echo "No output file"
+
+      - name: Upload raw analysis report
         uses: actions/upload-artifact@v4
         with:
-          name: analysis-report
-          path: flutter_analysis_output.txt
+          name: full-analysis-report
+          path: analysis_output.txt
           retention-days: 7
 
-      - name: Check for errors and fail if found
+      - name: Extract only errors and warnings
         run: |
-          if grep -q "error •" flutter_analysis_output.txt; then
-            echo "❌ Flutter analysis found errors. See artifact for details."
-            exit 1
-          fi
-          echo "✅ No critical errors found."
+          grep -E "error •|warning •" analysis_output.txt > errors_only.txt || true
+          echo "--- Full list of problems ---"
+          cat errors_only.txt
+
+      - name: Count errors
+        id: count
+        run: |
+          ERROR_COUNT=$(grep -c "error •" analysis_output.txt || echo "0")
+          WARNING_COUNT=$(grep -c "warning •" analysis_output.txt || echo "0")
+          echo "ERROR_COUNT=$ERROR_COUNT" >> $GITHUB_OUTPUT
+          echo "WARNING_COUNT=$WARNING_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Create job summary
+        run: |
+          echo "## 📊 Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Errors**: ${{ steps.count.outputs.ERROR_COUNT }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Warnings**: ${{ steps.count.outputs.WARNING_COUNT }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ Detailed errors (if any)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep "error •" analysis_output.txt >> $GITHUB_STEP_SUMMARY || echo "No errors found" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Final status (keep going even with errors)
+        run: |
+          echo "✅ Analysis completed. Found ${{ steps.count.outputs.ERROR_COUNT }} error(s) and ${{ steps.count.outputs.WARNING_COUNT }} warning(s)."
+          echo "Download the artifact 'full-analysis-report' to see all details."
