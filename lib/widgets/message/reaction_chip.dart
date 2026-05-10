@@ -40,7 +40,7 @@ class _ReactionChipState extends State<ReactionChip> {
     final restingFill = isChosen
         ? colorScheme.primaryContainer
         : colorScheme.surfaceContainerHighest;
-    final pressedFill = colorScheme.primary.withOpacity(0.18); // اصلاح شده
+    final pressedFill = colorScheme.primary.withOpacity(0.18);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -65,7 +65,7 @@ class _ReactionChipState extends State<ReactionChip> {
             border: Border.all(
               color: isChosen
                   ? colorScheme.primary
-                  : colorScheme.outline.withOpacity(0.3), // اصلاح شده
+                  : colorScheme.outline.withOpacity(0.3),
               width: 1,
             ),
           ),
@@ -81,7 +81,7 @@ class _ReactionChipState extends State<ReactionChip> {
                   fontWeight: isChosen ? FontWeight.w600 : FontWeight.w400,
                   color: isChosen
                       ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSurface.withOpacity(0.7), // اصلاح شده
+                      : colorScheme.onSurface.withOpacity(0.7),
                 ),
               ),
             ],
@@ -121,10 +121,11 @@ class ReactionGlyph extends StatelessWidget {
           width: 16,
           height: 16,
           fit: BoxFit.contain,
-          errorBuilder: (_, __) => Icon(
+          // اصلاح: سه پارامتر (context, error, stackTrace)
+          errorBuilder: (context, error, stackTrace) => Icon(
             Icons.emoji_emotions,
             size: 14,
-            color: colorScheme.onSurface.withOpacity(0.6), // اصلاح شده
+            color: colorScheme.onSurface.withOpacity(0.6),
           ),
         ),
       );
@@ -135,14 +136,14 @@ class ReactionGlyph extends StatelessWidget {
         height: 14,
         child: CircularProgressIndicator(
           strokeWidth: 1.5,
-          color: colorScheme.onSurface.withOpacity(0.4), // اصلاح شده
+          color: colorScheme.onSurface.withOpacity(0.4),
         ),
       );
     }
     return Icon(
       Icons.emoji_emotions,
       size: 14,
-      color: colorScheme.onSurface.withOpacity(0.6), // اصلاح شده
+      color: colorScheme.onSurface.withOpacity(0.6),
     );
   }
 }
