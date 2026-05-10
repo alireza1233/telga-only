@@ -13,10 +13,10 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
 
-      - name: Setup Flutter 3.31.0
+      - name: Setup Flutter 3.29.0
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.31.0'   # حاوی Dart 3.8.0 (>=3.7.0)
+          flutter-version: '3.29.0'   # حاوی Dart 3.7.0 (>=3.7.0)
           channel: 'stable'
           cache: true
 
@@ -54,7 +54,7 @@ jobs:
       - name: Commit and push the APK
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config.user.email "github-actions[bot]@users.noreply.github.com"
           git add my-build/app-debug.apk -f
           git commit -m "Add test APK from workflow [skip ci]" || echo "No changes"
           git push
