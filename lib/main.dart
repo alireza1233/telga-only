@@ -122,7 +122,8 @@ class _AppWrapperState extends ConsumerState<AppWrapper>
               return _buildLoadingScreen();
             },
             loading: () => _buildLoadingScreen(),
-            error: (_, __) => const HomeScreen(), // <-- اصلاح شد (__ به جای _ دوم)
+            error: (_, __) =>
+                const HomeScreen(), // Show home on chat error, let it handle retry
           );
         } else if (!authState.isInitialized) {
           // Still determining auth status - show loading
@@ -183,7 +184,7 @@ class _AppWrapperState extends ConsumerState<AppWrapper>
               _loadingPhrase,
               style: TextStyle(
                 fontSize: 16,
-                color: colorScheme.onSurface.withOpacity(0.7), // <-- withValues -> withOpacity
+                color: colorScheme.onSurface.withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 12),
