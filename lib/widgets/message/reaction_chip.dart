@@ -121,7 +121,7 @@ class ReactionGlyph extends StatelessWidget {
           width: 16,
           height: 16,
           fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => Icon(
+          errorBuilder: (_, __) => Icon(
             Icons.emoji_emotions,
             size: 14,
             color: colorScheme.onSurface.withOpacity(0.6), // اصلاح شده
