@@ -54,7 +54,6 @@ class _AnimationMessageWidgetState
   @override
   void didUpdateWidget(AnimationMessageWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // File just finished downloading — initialize player
     if (oldWidget.animationPath != widget.animationPath &&
         widget.animationPath != null &&
         widget.animationPath!.isNotEmpty) {
@@ -148,7 +147,6 @@ class _AnimationMessageWidgetState
     final thumbPath = widget.thumbnailPath;
     final hasThumbnail = thumbPath != null && thumbPath.isNotEmpty;
 
-    // Watch download progress for this file
     final downloadState = ref.watchFileDownloadState(widget.animationFileId);
     final hasFailed =
         downloadState != null && downloadState.status == DownloadStatus.failed;
@@ -166,7 +164,6 @@ class _AnimationMessageWidgetState
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Background: playing video, or thumbnail (if downloaded)
               if (_isInitialized && _videoController != null)
                 Video(
                   controller: _videoController!,
@@ -182,9 +179,8 @@ class _AnimationMessageWidgetState
                     details: '$err',
                   ),
                 ),
-              // Error takes over the entire tile when present
-              ?error,
-              // Download progress (only when not yet downloaded and no error)
+              // اصلاح شده
+              if (error != null) error!,
               if (!hasAnimation && error == null)
                 Center(
                   child: CircularDownloadProgress(
@@ -192,7 +188,6 @@ class _AnimationMessageWidgetState
                     hasError: false,
                   ),
                 ),
-              // GIF badge
               Positioned(
                 bottom: 8,
                 left: 8,
@@ -290,7 +285,8 @@ class _FullScreenAnimationState extends State<_FullScreenAnimation> {
           slidePageBackgroundHandler: (offset, pageSize) {
             final double ratio = (offset.dy.abs() / (pageSize.height / 2))
                 .clamp(0.0, 1.0);
-            return Colors.black.withValues(alpha: 1 - ratio);
+            // اصلاح شده
+            return Colors.black.withOpacity(1 - ratio);
           },
           child: GestureDetector(
             onTap: _close,
