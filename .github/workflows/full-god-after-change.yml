@@ -15,7 +15,6 @@ jobs:
           repository: alireza1233/telga-only
           path: my_app
 
-      # ======================== تغییر اصلی ========================
       - name: Setup Flutter stable 3.27.4
         uses: subosito/flutter-action@v2
         with:
@@ -33,15 +32,19 @@ jobs:
             21
           java-package: jdk
 
-      - name: Force JAVA_HOME to JDK 17
+      - name: Set correct JAVA_HOME for JDK 17 (with x64)
         shell: pwsh
         run: |
-          $jdk17 = Get-ChildItem "C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\17*" -Directory | Select-Object -First 1
-          if ($jdk17) {
-            echo "JAVA_HOME=$($jdk17.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
-            Write-Host "JAVA_HOME set to $($jdk17.FullName)"
+          # مسیر صحیح JDK 17 که شامل زیرپوشه x64 است
+          $jdkRoot = "C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\17.0.18-8"
+          $javaHome = "$jdkRoot\x64"
+          if (Test-Path $javaHome) {
+            echo "JAVA_HOME=$javaHome" | Out-File -FilePath $env:GITHUB_ENV -Append
+            echo "JAVA_HOME_17_X64=$javaHome" | Out-File -FilePath $env:GITHUB_ENV -Append
+            Write-Host "JAVA_HOME set to $javaHome"
           } else {
-            Write-Warning "JDK 17 not found, keeping default"
+            Write-Error "JDK 17 x64 not found at $javaHome"
+            exit 1
           }
 
       # ======================== نصب Android SDK با حلقه تکرار ========================
@@ -283,7 +286,7 @@ jobs:
           set GRADLE_USER_HOME=%~dp0\.gradle
           set PUB_CACHE=%~dp0pub-cache
           set FLUTTER_ROOT=%~dp0flutter
-          for /d %%i in ("%~dp0jdks\17*") do set JAVA_HOME=%%i
+          for /d %%i in ("%~dp0jdks\17*\x64") do set JAVA_HOME=%%i
           set PATH=%FLUTTER_ROOT%\bin;%JAVA_HOME%\bin;%ANDROID_HOME%\platform-tools;%ANDROID_HOME%\cmdline-tools\latest\bin;%PATH%
           echo Ultimate offline environment ready.
           "@
@@ -295,7 +298,7 @@ jobs:
           `$env:GRADLE_USER_HOME = "`$PSScriptRoot\.gradle"
           `$env:PUB_CACHE = "`$PSScriptRoot\pub-cache"
           `$env:FLUTTER_ROOT = "`$PSScriptRoot\flutter"
-          `$jdkPath = Get-ChildItem "`$PSScriptRoot\jdks\17*" -Directory | Select-Object -First 1
+          `$jdkPath = Get-ChildItem "`$PSScriptRoot\jdks\17*\x64" -Directory | Select-Object -First 1
           `$env:JAVA_HOME = `$jdkPath.FullName
           `$env:PATH = "`$env:FLUTTER_ROOT\bin;`$env:JAVA_HOME\bin;`$env:ANDROID_HOME\platform-tools;`$env:ANDROID_HOME\cmdline-tools\latest\bin;`$env:PATH"
           Write-Host "Ready."
