@@ -1,4 +1,4 @@
-name: 🧪 TEST BUILD - Check if app compiles (with split)
+name: 🧪 TEST BUILD - Check if app compiles (with split 95MB)
 
 on:
   workflow_dispatch:
@@ -45,16 +45,14 @@ jobs:
       - name: Build Android APK (debug)
         run: flutter build apk --debug
 
-      - name: Split APK into 90MB chunks
+      - name: Split APK into 95MB chunks
         shell: bash
         run: |
           mkdir -p my-splits
-          # مسیر فایل APK ساخته شده
           APK_PATH="build/app/outputs/flutter-apk/app-debug.apk"
-          # تیکه‌ها 90 مگابایت
-          split -b 90m "$APK_PATH" "my-splits/app-debug.apk.part_"
+          # هر تیکه 95 مگابایت
+          split -b 95m "$APK_PATH" "my-splits/app-debug.apk.part_"
           
-          # یه فایل متنی که توضیح بده چطور دوباره فایل رو به دست بیاری
           cat > "my-splits/README.txt" << 'EOF'
           How to Reassemble the APK:
           1. Download ALL these part files (app-debug.apk.part_aa, part_ab, ...) into the same folder.
@@ -69,5 +67,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add my-splits/ -f
-          git commit -m "Add APK split into 90MB chunks [skip ci]" || echo "No changes to commit"
+          git commit -m "Add APK split into 95MB chunks [skip ci]" || echo "No changes to commit"
           git push
