@@ -1,4 +1,4 @@
-name: 🔥After changes ULTIMATE OFFLINE BUNDLE (Android + Windows) - Split for GitHub Releases
+name: 🔥 ULTIMATE OFFLINE BUNDLE (Android + Windows) - Split for GitHub Releases
 
 on: workflow_dispatch
 
@@ -19,10 +19,9 @@ jobs:
       - name: Setup Flutter stable 3.27.4
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.4'    # از 3.24.3 به 3.27.4
+          flutter-version: '3.27.4'
           channel: 'stable'
           cache: true
-      # ===========================================================
 
       - name: Setup JDK 11, 17, 21
         uses: actions/setup-java@v4
@@ -34,8 +33,7 @@ jobs:
             21
           java-package: jdk
 
-      # ======================== اختیاری ولی توصیه شده ========================
-      - name: Force JAVA_HOME to JDK 17 (for Android build consistency)
+      - name: Force JAVA_HOME to JDK 17
         shell: pwsh
         run: |
           $jdk17 = Get-ChildItem "C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\17*" -Directory | Select-Object -First 1
@@ -45,9 +43,9 @@ jobs:
           } else {
             Write-Warning "JDK 17 not found, keeping default"
           }
-      # ====================================================================
 
-      - name: Install full Android SDK
+      # ======================== نصب Android SDK با حلقه تکرار ========================
+      - name: Install full Android SDK (with retry)
         shell: pwsh
         run: |
           $androidHome = "$env:LOCALAPPDATA\Android\Sdk"
@@ -62,7 +60,33 @@ jobs:
           if (!(Test-Path $sdkmanagerPath)) {
             Write-Host "Downloading command line tools..."
             $zipFile = "sdk-tools.zip"
-            curl -o $zipFile https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip
+            $maxRetries = 5
+            $retryCount = 0
+            $downloaded = $false
+            while (-not $downloaded -and $retryCount -lt $maxRetries) {
+              try {
+                Write-Host "Attempt $($retryCount+1) of $maxRetries"
+                curl -L --retry 3 --retry-delay 5 --max-time 300 -o $zipFile https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip
+                $fileSize = (Get-Item $zipFile).Length
+                if ($fileSize -gt 140MB -and $fileSize -lt 160MB) {
+                  $downloaded = $true
+                  Write-Host "Download successful, size: $([math]::Round($fileSize/1MB,2)) MB"
+                } else {
+                  Write-Warning "Downloaded file size unexpected: $([math]::Round($fileSize/1MB,2)) MB, retrying..."
+                  Remove-Item $zipFile -Force -ErrorAction SilentlyContinue
+                  $retryCount++
+                }
+              } catch {
+                Write-Warning "Download failed: $_"
+                $retryCount++
+                Start-Sleep -Seconds 5
+              }
+            }
+            if (-not $downloaded) {
+              Write-Error "Failed to download command line tools after $maxRetries attempts."
+              exit 1
+            }
+
             $tempExtract = Join-Path $env:TEMP "cmdline-tools-extract"
             Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
             Expand-Archive -Path $zipFile -DestinationPath $tempExtract -Force
