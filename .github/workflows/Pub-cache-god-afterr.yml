@@ -1,4 +1,4 @@
-name: ðŸ”¥ Full Build + Only Pub Cache (No Mirrors)
+name: ðŸ”¥ Full Build + Only Pub Cache (No Mirrors - Fixed)
 
 on:
   workflow_dispatch:
@@ -16,11 +16,13 @@ jobs:
           repository: alireza1233/telga-only
           path: telga-project
 
-      - name: Remove any mirror environment variables (global)
-        run: |
-          echo "PUB_HOSTED_URL=" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "FLUTTER_STORAGE_BASE_URL=" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Remove mirror environment variables completely
         shell: pwsh
+        run: |
+          Remove-Item -Path Env:PUB_HOSTED_URL -ErrorAction SilentlyContinue
+          Remove-Item -Path Env:FLUTTER_STORAGE_BASE_URL -ErrorAction SilentlyContinue
+          echo "PUB_HOSTED_URL" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "FLUTTER_STORAGE_BASE_URL" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Setup Flutter stable (3.24.3)
         uses: subosito/flutter-action@v2
@@ -71,7 +73,6 @@ jobs:
           }
 
       - name: Get Pub Cache path
-        id: cache-path
         run: |
           $pubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
           echo "CACHE_PATH=$pubCache" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -102,7 +103,7 @@ jobs:
         run: |
           $tag = "pub-cache-full-v$((Get-Date -Format 'yyyyMMdd-HHmmss'))"
           echo "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
-          gh release create $tag --title "ðŸ“¦ Complete Pub Cache (no mirrors, full build)" --notes "Download all .part files, combine with copy /b, extract with 7-Zip, then set PUB_CACHE environment variable." --repo "${{ github.repository }}"
+          gh release create $tag --title "ðŸ“¦ Complete Pub Cache (no mirrors, fixed)" --notes "Download all .part files, combine with copy /b, extract with 7-Zip, then set PUB_CACHE environment variable." --repo "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
