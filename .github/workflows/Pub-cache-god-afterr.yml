@@ -16,25 +16,20 @@ jobs:
           repository: alireza1233/telga-only
           path: telga-project
 
-      # ====================== پاک‌سازی کامل Mirror ======================
-      - name: Remove all mirror environment variables
+      - name: Remove all mirror variables
         shell: pwsh
         run: |
           Remove-Item -Path Env:PUB_HOSTED_URL -ErrorAction SilentlyContinue
           Remove-Item -Path Env:FLUTTER_STORAGE_BASE_URL -ErrorAction SilentlyContinue
-          
-          # برای قدم‌های بعدی هم پاک شود
           "PUB_HOSTED_URL=" | Out-File -FilePath $env:GITHUB_ENV -Append
           "FLUTTER_STORAGE_BASE_URL=" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "✅ Mirrors removed successfully"
 
-      - name: Setup Flutter 3.24.3 Stable
+      - name: Setup Flutter 3.24.3
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.3'
           channel: 'stable'
           cache: true
-          cache-key: flutter-3.24.3-${{ runner.os }}
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -42,27 +37,30 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # ====================== Build & Dependencies ======================
-      - name: Clean and Get Dependencies (pub.dev)
+      - name: Flutter Clean + Pub Get
         working-directory: ./telga-project
         run: |
           flutter clean
           flutter pub get --verbose
 
-      - name: Build Android APK (Release)
+      - name: Build APK Release
         working-directory: ./telga-project
         run: flutter build apk --release
 
-      - name: Build Windows Executable (Release)
+      - name: Build Windows Release
         working-directory: ./telga-project
         run: flutter build windows --release
 
-      - name: Run Build Runner (if exists)
+      # ====================== Build Runner (بهبود یافته) ======================
+      - name: Run Build Runner (Safe)
         working-directory: ./telga-project
+        continue-on-error: true
         run: |
-          flutter pub run build_runner build --delete-conflicting-outputs || echo "No build_runner needed or failed (ignored)"
+          echo "Running build_runner..."
+          flutter pub run build_runner build --delete-conflicting-outputs --verbose || echo "Build runner finished with issues (ignored)"
+          echo "Build runner step completed."
 
-      # ====================== Pub Cache Compression ======================
+      # ====================== Pub Cache ======================
       - name: Get Pub Cache Path
         shell: pwsh
         run: |
@@ -73,27 +71,25 @@ jobs:
       - name: Install 7-Zip
         run: choco install 7zip -y --no-progress
 
-      - name: Compress Pub Cache (Ultra Compression)
+      - name: Compress Pub Cache (Ultra)
         shell: pwsh
         run: |
-          & "C:\Program Files\7-Zip\7z.exe" a -t7z -mx=9 -md=64m -mmt=on `
-            -mfb=64 -mlc=8 -m0=LZMA2:d256m `
-            "pub-cache-full.7z" "$env:PUB_CACHE_PATH" -bsp1
+          & "C:\Program Files\7-Zip\7z.exe" a -t7z -mx=9 -md=64m -mmt=on -mfb=64 -mlc=8 -m0=LZMA2:d256m "pub-cache-full.7z" "$env:PUB_CACHE_PATH"
 
-      - name: Test Archive Integrity
+      - name: Test Archive
         shell: pwsh
         run: |
           & "C:\Program Files\7-Zip\7z.exe" t "pub-cache-full.7z"
-          if ($LASTEXITCODE -ne 0) { throw "Archive is corrupted!" }
+          if ($LASTEXITCODE -ne 0) { throw "Archive corrupted!" }
 
-      - name: Split Archive (1.8GB parts)
+      - name: Split Archive
         shell: bash
         run: |
-          split -b 1800M -a 2 -d --verbose pub-cache-full.7z pub-cache.7z.part
+          split -b 1800M -a 2 -d pub-cache-full.7z pub-cache.7z.part
           ls -lh pub-cache.7z.part*
 
-      # ====================== Release & Upload ======================
-      - name: Create GitHub Release
+      # ====================== Release ======================
+      - name: Create Release
         id: create_release
         shell: pwsh
         run: |
@@ -102,12 +98,12 @@ jobs:
           
           gh release create $tag `
             --title "Complete Pub Cache (No Mirrors) - $tag" `
-            --notes "دانلود تمام فایل‌های part، با دستور copy /b ترکیب کنید." `
+            --notes "دانلود همه partها و ترکیب با combine_pub_cache.bat" `
             --repo "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Split Parts
+      - name: Upload Parts
         shell: pwsh
         run: |
           Get-ChildItem -Filter "pub-cache.7z.part*" | ForEach-Object {
@@ -121,15 +117,13 @@ jobs:
         run: |
           $script = @"
           @echo off
-          echo Combining parts...
           copy /b pub-cache.7z.part* pub-cache-full.7z
-          echo Done! Extract with 7-Zip.
-          echo After extraction, set environment variable:
-          echo PUB_CACHE=C:\path\to\extracted\pub\cache
+          echo.
+          echo ✅ Done! Now extract with 7-Zip.
+          echo Set PUB_CACHE environment variable to the extracted folder.
           pause
           "@
           $script | Out-File -FilePath "combine_pub_cache.bat" -Encoding ascii
-          
           gh release upload $env:RELEASE_TAG "combine_pub_cache.bat" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
