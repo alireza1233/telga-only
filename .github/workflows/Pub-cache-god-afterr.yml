@@ -1,0 +1,132 @@
+name: 🧩 Full Build + Only Pub Cache Upload
+
+on:
+  workflow_dispatch:   # فقط دستی اجرا شود
+
+jobs:
+  build-and-upload-pub-cache:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout the repository (telga-only)
+        uses: actions/checkout@v4
+        with:
+          repository: alireza1233/telga-only
+          path: telga-project
+
+      - name: Setup Flutter (stable 3.24.3)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.3'
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Java (for Android build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Clean and get dependencies (full)
+        working-directory: ./telga-project
+        run: |
+          flutter clean
+          flutter pub get --verbose
+
+      - name: Build Android APK (release)
+        working-directory: ./telga-project
+        run: flutter build apk --release
+
+      - name: Build Windows executable (release)
+        working-directory: ./telga-project
+        run: flutter build windows --release
+
+      # (اختیاری) اجرای build_runner اگر در پروژه استفاده می‌شود
+      - name: Run code generator (if any)
+        working-directory: ./telga-project
+        run: flutter pub run build_runner build --delete-conflicting-outputs || echo "No build_runner needed"
+
+      # نصب پکیج‌های پرکاربرد به صورت global برای غنی‌تر شدن pub-cache
+      - name: Activate extra global packages (for future offline use)
+        shell: pwsh
+        run: |
+          $extra = @(
+            "build_runner", "riverpod_generator", "hive_generator", "flutter_gen_runner",
+            "very_good_cli", "dart_style", "flutter_lints", "mockito", "sqflite_common_ffi",
+            "path_provider", "shared_preferences", "dio", "get_it", "bloc", "flutter_bloc",
+            "equatable", "json_serializable", "retrofit_generator", "freezed", "floor_generator",
+            "drift_dev", "flutter_native_splash", "flutter_launcher_icons", "icons_launcher",
+            "media_kit", "media_kit_video", "photo_manager", "image_picker", "lottie",
+            "flutter_riverpod", "country_picker", "extended_image", "file_picker",
+            "logger", "mobile_scanner", "url_launcher", "intl", "path", "ffi"
+          )
+          foreach ($pkg in $extra) {
+            flutter pub global activate $pkg
+          }
+
+      - name: Locate Pub Cache directory
+        id: pub-cache-path
+        run: |
+          $pubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
+          echo "CACHE_PATH=$pubCache" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Pub Cache is at: $pubCache"
+        shell: pwsh
+
+      - name: Install 7-Zip
+        run: choco install 7zip -y --no-progress
+
+      - name: Compress entire Pub Cache (max compression, solid block)
+        shell: pwsh
+        run: |
+          & "C:\Program Files\7-Zip\7z.exe" a -t7z -mx=9 -md=64m -mmt=on "pub-cache-full.7z" "$env:CACHE_PATH" -bsp1 -bse1
+          $size = [math]::Round((Get-Item "pub-cache-full.7z").Length / 1GB, 2)
+          Write-Host "Compressed size: $size GB"
+
+      - name: Test archive integrity
+        shell: pwsh
+        run: |
+          & "C:\Program Files\7-Zip\7z.exe" t "pub-cache-full.7z"
+          if ($LASTEXITCODE -ne 0) { throw "Archive corrupted!" }
+
+      - name: Split archive into 1.8GB chunks (for GitHub Releases)
+        shell: bash
+        run: |
+          split -b 1800M -a 2 -d --verbose pub-cache-full.7z "pub-cache.7z.part"
+          ls -lh pub-cache.7z.part*
+
+      - name: Create GitHub Release
+        id: create_release
+        run: |
+          $tag = "pub-cache-full-build-v$((Get-Date -Format 'yyyyMMdd-HHmmss'))"
+          echo "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+          gh release create $tag --title "📦 Complete Pub Cache (after full Android+Windows build)" --notes "Contains ALL packages used by telga-project + extra global packages. Combine with copy /b and extract with 7-Zip." --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+
+      - name: Upload split parts to Release
+        run: |
+          Get-ChildItem -Filter "pub-cache.7z.part*" | ForEach-Object {
+            gh release upload $env:RELEASE_TAG "$($_.FullName)" --clobber --repo "${{ github.repository }}"
+            Write-Host "Uploaded $($_.Name) ($([math]::Round($_.Length/1MB,2)) MB)"
+          }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+
+      - name: Upload combine helper script
+        run: |
+          $combineScript = @"
+          @echo off
+          echo Combining parts into pub-cache-full.7z ...
+          copy /b pub-cache.7z.part* pub-cache-full.7z
+          echo Done. Extract with 7-Zip, then set environment variable PUB_CACHE to the extracted folder.
+          pause
+          "@
+          $combineScript | Out-File -FilePath "combine_pub_cache.bat" -Encoding ascii
+          gh release upload $env:RELEASE_TAG "combine_pub_cache.bat" --clobber --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
