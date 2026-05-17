@@ -1,4 +1,4 @@
-name: ðŸ”¥ Full Build + Only Pub Cache (No Mirrors - Fixed)
+name: 🔥 Full Build + Complete Pub Cache (No Mirrors)
 
 on:
   workflow_dispatch:
@@ -10,26 +10,31 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout repository (telga-only)
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           repository: alireza1233/telga-only
           path: telga-project
 
-      - name: Remove mirror environment variables completely
+      # ====================== پاک‌سازی کامل Mirror ======================
+      - name: Remove all mirror environment variables
         shell: pwsh
         run: |
           Remove-Item -Path Env:PUB_HOSTED_URL -ErrorAction SilentlyContinue
           Remove-Item -Path Env:FLUTTER_STORAGE_BASE_URL -ErrorAction SilentlyContinue
-          echo "PUB_HOSTED_URL" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "FLUTTER_STORAGE_BASE_URL" | Out-File -FilePath $env:GITHUB_ENV -Append
+          
+          # برای قدم‌های بعدی هم پاک شود
+          "PUB_HOSTED_URL=" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FLUTTER_STORAGE_BASE_URL=" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "✅ Mirrors removed successfully"
 
-      - name: Setup Flutter stable (3.24.3)
+      - name: Setup Flutter 3.24.3 Stable
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.3'
           channel: 'stable'
           cache: true
+          cache-key: flutter-3.24.3-${{ runner.os }}
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -37,97 +42,94 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Clean and get dependencies (direct from pub.dev)
+      # ====================== Build & Dependencies ======================
+      - name: Clean and Get Dependencies (pub.dev)
         working-directory: ./telga-project
         run: |
           flutter clean
           flutter pub get --verbose
 
-      - name: Build Android APK (release)
+      - name: Build Android APK (Release)
         working-directory: ./telga-project
         run: flutter build apk --release
 
-      - name: Build Windows executable (release)
+      - name: Build Windows Executable (Release)
         working-directory: ./telga-project
         run: flutter build windows --release
 
-      - name: Run code generator (if needed)
+      - name: Run Build Runner (if exists)
         working-directory: ./telga-project
-        run: flutter pub run build_runner build --delete-conflicting-outputs || echo "No build_runner"
-
-      - name: Activate extra global packages
-        shell: pwsh
         run: |
-          $extra = @(
-            "build_runner", "riverpod_generator", "hive_generator", "flutter_gen_runner",
-            "very_good_cli", "dart_style", "flutter_lints", "mockito", "sqflite_common_ffi",
-            "path_provider", "shared_preferences", "dio", "get_it", "bloc", "flutter_bloc",
-            "equatable", "json_serializable", "retrofit_generator", "freezed", "floor_generator",
-            "drift_dev", "flutter_native_splash", "flutter_launcher_icons", "icons_launcher",
-            "media_kit", "media_kit_video", "photo_manager", "image_picker", "lottie",
-            "flutter_riverpod", "country_picker", "extended_image", "file_picker",
-            "logger", "mobile_scanner", "url_launcher", "intl", "path", "ffi"
-          )
-          foreach ($pkg in $extra) {
-            flutter pub global activate $pkg
-          }
+          flutter pub run build_runner build --delete-conflicting-outputs || echo "No build_runner needed or failed (ignored)"
 
-      - name: Get Pub Cache path
+      # ====================== Pub Cache Compression ======================
+      - name: Get Pub Cache Path
+        shell: pwsh
         run: |
           $pubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
-          echo "CACHE_PATH=$pubCache" | Out-File -FilePath $env:GITHUB_ENV -Append
-        shell: pwsh
+          echo "PUB_CACHE_PATH=$pubCache" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "Pub cache path: $pubCache"
 
       - name: Install 7-Zip
         run: choco install 7zip -y --no-progress
 
-      - name: Compress entire Pub Cache (max compression)
+      - name: Compress Pub Cache (Ultra Compression)
         shell: pwsh
         run: |
-          & "C:\Program Files\7-Zip\7z.exe" a -t7z -mx=9 -md=64m -mmt=on "pub-cache-full.7z" "$env:CACHE_PATH" -bsp1 -bse1
+          & "C:\Program Files\7-Zip\7z.exe" a -t7z -mx=9 -md=64m -mmt=on `
+            -mfb=64 -mlc=8 -m0=LZMA2:d256m `
+            "pub-cache-full.7z" "$env:PUB_CACHE_PATH" -bsp1
 
-      - name: Test archive integrity
+      - name: Test Archive Integrity
         shell: pwsh
         run: |
           & "C:\Program Files\7-Zip\7z.exe" t "pub-cache-full.7z"
-          if ($LASTEXITCODE -ne 0) { throw "Archive corrupted!" }
+          if ($LASTEXITCODE -ne 0) { throw "Archive is corrupted!" }
 
-      - name: Split archive into 1.8GB chunks
+      - name: Split Archive (1.8GB parts)
         shell: bash
         run: |
-          split -b 1800M -a 2 -d --verbose pub-cache-full.7z "pub-cache.7z.part"
+          split -b 1800M -a 2 -d --verbose pub-cache-full.7z pub-cache.7z.part
           ls -lh pub-cache.7z.part*
 
+      # ====================== Release & Upload ======================
       - name: Create GitHub Release
         id: create_release
+        shell: pwsh
         run: |
-          $tag = "pub-cache-full-v$((Get-Date -Format 'yyyyMMdd-HHmmss'))"
+          $tag = "pub-cache-full-v$(Get-Date -Format 'yyyyMMdd-HHmmss')"
           echo "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
-          gh release create $tag --title "ðŸ“¦ Complete Pub Cache (no mirrors, fixed)" --notes "Download all .part files, combine with copy /b, extract with 7-Zip, then set PUB_CACHE environment variable." --repo "${{ github.repository }}"
+          
+          gh release create $tag `
+            --title "Complete Pub Cache (No Mirrors) - $tag" `
+            --notes "دانلود تمام فایل‌های part، با دستور copy /b ترکیب کنید." `
+            --repo "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
 
-      - name: Upload split parts
+      - name: Upload Split Parts
+        shell: pwsh
         run: |
           Get-ChildItem -Filter "pub-cache.7z.part*" | ForEach-Object {
-            gh release upload $env:RELEASE_TAG "$($_.FullName)" --clobber --repo "${{ github.repository }}"
+            gh release upload $env:RELEASE_TAG $_.FullName --clobber
           }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
 
-      - name: Upload combine script
+      - name: Upload Combine Script
+        shell: pwsh
         run: |
-          $combineScript = @"
+          $script = @"
           @echo off
-          echo Combining parts into pub-cache-full.7z ...
+          echo Combining parts...
           copy /b pub-cache.7z.part* pub-cache-full.7z
-          echo Done. Extract with 7-Zip, then set PUB_CACHE=extracted_folder_path
+          echo Done! Extract with 7-Zip.
+          echo After extraction, set environment variable:
+          echo PUB_CACHE=C:\path\to\extracted\pub\cache
           pause
           "@
-          $combineScript | Out-File -FilePath "combine_pub_cache.bat" -Encoding ascii
-          gh release upload $env:RELEASE_TAG "combine_pub_cache.bat" --clobber --repo "${{ github.repository }}"
+          $script | Out-File -FilePath "combine_pub_cache.bat" -Encoding ascii
+          
+          gh release upload $env:RELEASE_TAG "combine_pub_cache.bat" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
