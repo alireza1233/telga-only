@@ -1,0 +1,33 @@
+{
+  "name": "nakheir-server",
+  "version": "1.0.0",
+  "description": "Nakheir - E2EE Chat Application Server",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest",
+    "migrate": "node src/database/migrate.js"
+  },
+  "keywords": ["chat", "e2ee", "encryption"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "fastify": "^4.24.3",
+    "@fastify/websocket": "^10.1.1",
+    "pg": "^8.11.3",
+    "redis": "^4.6.12",
+    "jsonwebtoken": "^9.1.2",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.1",
+    "tweetnacl": "^1.0.3",
+    "libsodium.js": "^0.7.11",
+    "dotenv": "^16.3.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0"
+  }
+}
